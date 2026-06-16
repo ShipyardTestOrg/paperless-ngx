@@ -14,6 +14,11 @@ services:
       PAPERLESS_DBNAME: paperless
       PAPERLESS_DBUSER: paperless
       PAPERLESS_DBPASS: paperless
+      # Must live in `environment:`, NOT env_file: on Shipyard the env_file (.env)
+      # vars are not injected for this service (the DB/Redis vars above are, which is
+      # why Postgres/Redis connect), so the secret has to be inline here. THROWAWAY
+      # dev value — regenerate for any real use.
+      PAPERLESS_SECRET_KEY: dev-throwaway-secret-shipyard-eval-do-not-use-in-prod-0123456789
     ports:
       - "8010:8000"
     depends_on:
