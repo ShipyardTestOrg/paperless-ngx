@@ -1,0 +1,73 @@
+services:
+  cb-paperless:
+    build: .
+    env_file:
+      - ./.env
+    environment:
+      # Paperless reads PAPERLESS_* vars, not DATABASE_URL/REDIS_URL.
+      # Put boot-critical vars here so Shipyard injects them reliably
+      # (env_file is not guaranteed for build-from-source services).
+      PAPERLESS_REDIS: redis://redis:6379
+      PAPERLESS_DBENGINE: postgresql
+      PAPERLESS_DBHOST: postgres
+      PAPERLESS_DBPORT: "5432"
+      PAPERLESS_DBNAME: paperless
+      PAPERLESS_DBUSER: paperless
+      PAPERLESS_DBPASS: paperless
+      # granian/webserver listen port (matches systemd GRANIAN_PORT=8000)
+      PAPERLESS_PORT: "8000"
+      # Required signing key; supply a real value via Shipyard env vars.
+      PAPERLESS_SECRET_KEY: ${PAPERLESS_SECRET_KEY:-EDenp0yA7P2L5mVcBuXA8UduBWzMznLYu64_i_x5-kXNsaW3_iyBtvnL42nYAx2W2e_Ox8-53UZ01swQu3Puhg}
+    # Shipyard routes to this container via the labels below, so the app port
+    # only needs to be exposed inside the network. Publishing 8000:8000 on the
+    # host collided with an already-allocated host port and blocked startup.
+    expose:
+      - "8000"
+    volumes:
+      - data:/usr/src/paperless/data
+      - media:/usr/src/paperless/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    labels:
+      shipyard.route: '/'
+      shipyard.primary-route: 'true'
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: "paperless"
+      POSTGRES_PASSWORD: "paperless"
+      POSTGRES_DB: "paperless"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paperless -d paperless"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+volumes:
+  data:
+    labels:
+      shipyard.deploy.disk.size: 2Gi
+  media:
+    labels:
+      shipyard.deploy.disk.size: 2Gi
+  pgdata:
+    labels:
+      shipyard.deploy.disk.size: 5Gi
+  redisdata:
+    labels:
+      shipyard.deploy.disk.size: 1Gi
